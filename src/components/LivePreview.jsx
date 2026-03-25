@@ -1,9 +1,10 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import './LivePreview.css'
 
 export default function LivePreview({ mode, buildStatus, htmlCode, selectingElement, onElementSelected }) {
   const iframeRef = useRef(null)
   const [iframeKey, setIframeKey] = useState(0)
+  const [iframeReady, setIframeReady] = useState(false)
   const prevStatus = useRef(buildStatus.status)
 
   // Reload iframe when a build/rebuild finishes
@@ -12,25 +13,33 @@ export default function LivePreview({ mode, buildStatus, htmlCode, selectingElem
     const now = buildStatus.status
     prevStatus.current = now
     if (mode === 'zip' && now === 'ready' && (was === 'building' || was === 'modifying')) {
+      setIframeReady(false)
       setIframeKey(k => k + 1)
     }
   }, [mode, buildStatus.status])
 
-  // Enable / disable pick mode in the iframe via postMessage
+  // Send ENABLE/DISABLE postMessage — only after the iframe has loaded
   useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe?.contentWindow) return
-    iframe.contentWindow.postMessage(
+    if (!iframeReady) return
+    iframeRef.current?.contentWindow?.postMessage(
       { type: selectingElement ? 'ENABLE_SELECT_MODE' : 'DISABLE_SELECT_MODE' },
       '*'
     )
+  }, [selectingElement, iframeReady])
+
+  // Also send immediately on iframe load if pick mode is already active
+  const handleIframeLoad = useCallback(() => {
+    setIframeReady(true)
+    if (selectingElement) {
+      iframeRef.current?.contentWindow?.postMessage({ type: 'ENABLE_SELECT_MODE' }, '*')
+    }
   }, [selectingElement])
 
   // Listen for element-selected postMessage from iframe
   useEffect(() => {
     const handler = (e) => {
       if (e.data?.type === 'ELEMENT_SELECTED' && onElementSelected) {
-        onElementSelected(e.data.selector, e.data.text)
+        onElementSelected(e.data.selector, e.data.text, e.data.dataPoints || [])
       }
     }
     window.addEventListener('message', handler)
@@ -61,7 +70,7 @@ export default function LivePreview({ mode, buildStatus, htmlCode, selectingElem
         <div className="preview-toolbar-right">
           <span className="preview-mode-badge">{mode === 'zip' ? 'Figma Make' : 'HTML'}</span>
           {isReady && !selectingElement && <span className="preview-ready-badge">● Live</span>}
-          {selectingElement && <span className="preview-pick-badge">⊕ Click an element in the preview</span>}
+          {selectingElement && <span className="preview-pick-badge">⊕ Click any element in the preview</span>}
           {isModifying && <span className="preview-modifying-badge">⟳ AI applying changes...</span>}
         </div>
       </div>
@@ -78,16 +87,20 @@ export default function LivePreview({ mode, buildStatus, htmlCode, selectingElem
                   className="preview-frame"
                   src="/preview/"
                   title="Figma Make Preview"
+                  onLoad={handleIframeLoad}
                 />
-                {isModifying && <div className="modifying-overlay"><span className="modifying-spinner" />AI rebuilding…</div>}
-                {selectingElement && <div className="pick-overlay" />}
+                {isModifying && (
+                  <div className="modifying-overlay">
+                    <span className="modifying-spinner" />AI rebuilding…
+                  </div>
+                )}
               </>
             )}
             {isBuilding && <BuildProgress buildStatus={buildStatus} />}
             {isError && <ErrorState error={buildStatus.error} log={buildStatus.log} />}
             {buildStatus.status === 'idle' && (
               <Placeholder icon="⬡" title="No design loaded"
-                text="Upload a Figma Make ZIP file from the Design panel to see your dashboard here." />
+                text="Upload a Figma Make ZIP file from the Design panel." />
             )}
           </>
         )}
@@ -95,15 +108,16 @@ export default function LivePreview({ mode, buildStatus, htmlCode, selectingElem
         {/* ── HTML mode ────────────────────────────────────────────── */}
         {mode === 'html' && (
           htmlCode
-            ? <iframe ref={iframeRef} className="preview-frame" title="HTML Preview" sandbox="allow-scripts allow-same-origin" />
-            : <Placeholder icon="◇" title="No code loaded" text="Paste HTML in the Design panel to preview it here." />
+            ? <iframe ref={iframeRef} className="preview-frame" title="HTML Preview"
+                sandbox="allow-scripts allow-same-origin" />
+            : <Placeholder icon="◇" title="No code loaded"
+                text="Paste HTML in the Design panel to preview it here." />
         )}
       </div>
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
 function BuildProgress({ buildStatus }) {
   const { status, log } = buildStatus
   const STEPS = [
@@ -114,7 +128,6 @@ function BuildProgress({ buildStatus }) {
     { key: 'ready', label: 'Ready' },
   ]
   const currentIdx = STEPS.findIndex(s => s.key === status)
-
   return (
     <div className="build-progress">
       <div className="build-steps">
@@ -139,7 +152,7 @@ function BuildProgress({ buildStatus }) {
         </div>
       )}
       {status === 'installing' && (
-        <p className="build-note">Installing packages may take 2–5 minutes depending on your internet speed.</p>
+        <p className="build-note">Installing packages may take 2–5 minutes.</p>
       )}
     </div>
   )

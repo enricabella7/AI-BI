@@ -60,8 +60,10 @@
   position: relative;
   overflow: hidden;
 }
+/* pointer-events must remain enabled on the iframe so the injected
+   click handler inside it can fire and postMessage back to us */
 .preview-frame-wrap.picking iframe {
-  pointer-events: none; /* let postMessage handle it */
+  outline: 3px solid var(--accent);
 }
 .preview-frame {
   width: 100%;

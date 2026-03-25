@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Header from './components/Header.jsx'
 import CodeUpload from './components/CodeUpload.jsx'
 import LivePreview from './components/LivePreview.jsx'
 import ChatPanel from './components/ChatPanel.jsx'
 import DataSources from './components/DataSources.jsx'
-import DataMapping from './components/DataMapping.jsx'
+import DataMapping, { formatValue } from './components/DataMapping.jsx'
 import './App.css'
 
 const ACTIVE_BUILD = ['uploading', 'extracting', 'installing', 'building', 'modifying']
@@ -26,6 +26,7 @@ export default function App() {
 
   // Element pick mode coordination between DataMapping ↔ LivePreview
   const [selectingForId, setSelectingForId] = useState(null)
+  const [suggestedPoints, setSuggestedPoints] = useState([])
 
   const [chatOpen, setChatOpen] = useState(true)
   const [activeTab, setActiveTab] = useState('upload')
@@ -104,17 +105,18 @@ export default function App() {
     setSelectingForId(bindingId)
   }, [])
 
-  const handleElementSelected = useCallback((selector, text) => {
+  const handleElementSelected = useCallback((selector, text, dataPoints) => {
     if (!selectingForId) return
     setZipBindings(prev => prev.map(b =>
       b.id === selectingForId
         ? { ...b, selector, label: text || b.label }
         : b
     ))
+    setSuggestedPoints(dataPoints || [])
     setSelectingForId(null)
   }, [selectingForId])
 
-  // ── Sync ZIP bindings → server data overrides ───────────────────────────
+  // ── Sync ZIP bindings → server data overrides (with formatting) ─────────
   useEffect(() => {
     if (mode !== 'zip' || buildStatus.status !== 'ready') return
     const overrides = {}
@@ -122,8 +124,8 @@ export default function App() {
       if (!binding.selector || !binding.sourceId || !binding.column) continue
       const src = dataSources.find(s => s.id === binding.sourceId)
       if (!src?.data?.length) continue
-      const val = src.data[0][binding.column]
-      if (val !== undefined) overrides[binding.selector] = String(val)
+      const raw = src.data[0][binding.column]
+      if (raw !== undefined) overrides[binding.selector] = formatValue(raw, binding.format)
     }
     fetch('/api/data-override', {
       method: 'POST',
@@ -175,10 +177,12 @@ export default function App() {
                 mappings={mappings}
                 onMap={handleMap}
                 zipBindings={zipBindings}
+                suggestedPoints={suggestedPoints}
                 onAddBinding={handleAddBinding}
                 onRemoveBinding={handleRemoveBinding}
                 onUpdateBinding={handleUpdateBinding}
                 onStartPick={handleStartPick}
+                onClearSuggestions={() => setSuggestedPoints([])}
                 dataSources={dataSources}
               />
             )}

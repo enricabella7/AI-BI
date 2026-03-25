@@ -194,7 +194,8 @@ const PREVIEW_INJECT = `
         window.parent.postMessage({
           type: 'ELEMENT_SELECTED',
           selector: buildSelector(el),
-          text: (el.textContent || '').trim().slice(0, 60)
+          text: (el.textContent || '').trim().slice(0, 60),
+          dataPoints: extractDataPoints(el)
         }, '*');
       }
       document.addEventListener('mouseover', onOver, true);
@@ -207,13 +208,64 @@ const PREVIEW_INJECT = `
     }
   });
 
+  // ── Data-point detection ─────────────────────────────────────────────
+  function extractDataPoints(root) {
+    var points = [];
+    var seen = new Set();
+    walk(root);
+    return points.slice(0, 10);
+
+    function walk(node) {
+      if (points.length >= 10) return;
+      if (node.nodeType === 3) { // text node
+        var t = node.textContent.trim();
+        if (t && !seen.has(t) && isDataLike(t)) {
+          seen.add(t);
+          points.push({
+            selector: buildSelector(node.parentElement),
+            text: t,
+            type: detectType(t)
+          });
+        }
+      } else if (node.nodeType === 1) {
+        for (var i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i]);
+      }
+    }
+  }
+
+  function isDataLike(t) {
+    // Currency: $1,234 or $1.2M
+    if (/^\$[\d,]+(\.\d+)?[kKmMbB]?$/.test(t)) return true;
+    // Plain number with optional commas/decimals/abbreviation
+    if (/^[\d,]+(\.\d+)?[kKmMbB]?$/.test(t) && t.length > 0) return true;
+    // Percentage
+    if (/^\d+(\.\d+)?\s*%$/.test(t)) return true;
+    // Abbreviated: 1.2K, 3.4M
+    if (/^\d+(\.\d+)?\s*[kKmMbB]$/.test(t)) return true;
+    return false;
+  }
+
+  function detectType(t) {
+    if (/^\$/.test(t)) return 'currency';
+    if (/[%]$/.test(t)) return 'percentage';
+    if (/[kK]$/.test(t)) return 'abbreviated_k';
+    if (/[mM]$/.test(t)) return 'abbreviated_m';
+    if (/[bB]$/.test(t)) return 'abbreviated_b';
+    if (/^\d+$/.test(t.replace(/,/g, ''))) return 'integer';
+    return 'decimal';
+  }
+
   function buildSelector(el) {
-    if (el.id) return '#' + el.id;
+    if (!el) return '';
+    if (el.id) return '#' + CSS.escape(el.id);
     var parts = [];
     var cur = el;
     while (cur && cur !== document.documentElement) {
       var tag = cur.tagName.toLowerCase();
-      var cls = Array.from(cur.classList).slice(0, 2).join('.');
+      var cls = Array.from(cur.classList).filter(function(c) {
+        // skip Tailwind utility classes, keep semantic ones
+        return c.length > 2 && !/^(p|m|w|h|flex|grid|text|bg|border|rounded|items|justify|gap|col|row|space|overflow|cursor|font|leading|tracking|opacity|z|top|left|right|bottom|sr|not|min|max|aspect|basis|grow|shrink|order|self|place|content|divide|ring|shadow|outline|transition|duration|ease|delay|animate|scale|rotate|translate|skew|origin|pointer|select|resize|snap|scroll|touch|will|appearance|box|break|object|clear|float|isolate|mix|after|before|decoration|underline|line|list|table|caption|block|inline|hidden|visible|invisible|static|fixed|absolute|relative|sticky)(-|$)/.test(c);
+      }).slice(0, 2).join('.');
       var part = cls ? tag + '.' + cls : tag;
       var parent = cur.parentElement;
       if (parent) {
@@ -221,7 +273,7 @@ const PREVIEW_INJECT = `
         if (sibs.length > 1) part += ':nth-of-type(' + (sibs.indexOf(cur) + 1) + ')';
       }
       parts.unshift(part);
-      if (parts.length >= 4) break;
+      if (parts.length >= 5) break;
       cur = cur.parentElement;
     }
     return parts.join(' > ');
