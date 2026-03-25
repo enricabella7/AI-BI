@@ -6,6 +6,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { createHash } from 'node:crypto'
 
 const require = createRequire(import.meta.url)
 const AdmZip = require('adm-zip')
@@ -13,6 +14,7 @@ const AdmZip = require('adm-zip')
 // ── Shared server state ──────────────────────────────────────────────────────
 let buildState = { status: 'idle', log: [], outDir: null, workDir: null, error: null }
 let dataOverrides = {} // CSS selector → replacement text (for runtime data injection)
+let persistentWorkDir = null // reused across uploads to avoid reinstalling deps
 
 function figmaRenderPlugin() {
   return {
@@ -24,16 +26,25 @@ function figmaRenderPlugin() {
         if (req.method !== 'POST') { res.statusCode = 405; res.end(); return }
         collectBody(req).then(async (buf) => {
           try {
-            if (buildState.outDir) {
+            // Only delete the old workDir if we won't be reusing it
+            if (buildState.outDir && !(persistentWorkDir && fs.existsSync(persistentWorkDir))) {
               fs.rm(path.dirname(buildState.outDir), { recursive: true, force: true }, () => {})
             }
             buildState = { status: 'extracting', log: ['Extracting zip...'], outDir: null, workDir: null, error: null }
             dataOverrides = {}
 
-            const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'figma-'))
+            let workDir
+            if (persistentWorkDir && fs.existsSync(persistentWorkDir)) {
+              workDir = persistentWorkDir
+              addLog('Reusing existing work directory.')
+            } else {
+              workDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'figma-'))
+              persistentWorkDir = workDir
+            }
+
             const zip = new AdmZip(buf)
             zip.extractAllTo(workDir, true)
-            addLog('Extracted to temp directory.')
+            addLog('Extracted to work directory.')
             buildState.status = 'installing'
 
             json(res, { ok: true })
@@ -312,12 +323,41 @@ function patchPackageJson(workDir) {
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
 }
 
+// ── Dependency hash helpers ───────────────────────────────────────────────────
+function depsHash(pkg) {
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+  return createHash('md5').update(JSON.stringify(deps)).digest('hex')
+}
+
+function needsInstall(workDir) {
+  const nmPath = path.join(workDir, 'node_modules')
+  const hashPath = path.join(workDir, '.ai-bi-deps-hash')
+  if (!fs.existsSync(nmPath)) return true
+  if (!fs.existsSync(hashPath)) return true
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(workDir, 'package.json'), 'utf-8'))
+    return depsHash(pkg) !== fs.readFileSync(hashPath, 'utf-8').trim()
+  } catch { return true }
+}
+
+function saveDepsHash(workDir) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(workDir, 'package.json'), 'utf-8'))
+    fs.writeFileSync(path.join(workDir, '.ai-bi-deps-hash'), depsHash(pkg))
+  } catch {}
+}
+
 // ── Build pipeline ───────────────────────────────────────────────────────────
 async function runBuild(workDir) {
   try {
     patchPackageJson(workDir)
-    addLog('Installing dependencies (this may take a few minutes)...')
-    await runCommand('npm', ['install', '--legacy-peer-deps'], workDir)
+    if (needsInstall(workDir)) {
+      addLog('Installing dependencies (this may take a few minutes)...')
+      await runCommand('npm', ['install', '--legacy-peer-deps'], workDir)
+      saveDepsHash(workDir)
+    } else {
+      addLog('Dependencies unchanged — skipping npm install.')
+    }
 
     buildState.status = 'building'
     addLog('Building project...')
