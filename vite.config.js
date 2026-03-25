@@ -123,9 +123,39 @@ function serveFile(filePath, res) {
   fs.createReadStream(filePath).pipe(res)
 }
 
+// ── Patch package.json ───────────────────────────────────────────────────────
+// Figma Make exports react/react-dom as optional peerDependencies, which npm
+// won't install automatically. Move them into regular dependencies.
+function patchPackageJson(workDir) {
+  const pkgPath = path.join(workDir, 'package.json')
+  if (!fs.existsSync(pkgPath)) return
+
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+  const peers = pkg.peerDependencies || {}
+
+  pkg.dependencies = pkg.dependencies || {}
+  for (const [name, version] of Object.entries(peers)) {
+    if (!pkg.dependencies[name]) {
+      pkg.dependencies[name] = version
+      addLog(`Promoted peer dependency: ${name}@${version}`)
+    }
+  }
+
+  // Remove peerDependencies to avoid conflicts
+  delete pkg.peerDependencies
+  delete pkg.peerDependenciesMeta
+
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2), 'utf-8')
+}
+
 // ── Build pipeline ──────────────────────────────────────────────────────────
 async function runBuild(workDir) {
   try {
+    // Figma Make puts react/react-dom as optional peerDependencies, which npm
+    // skips by default. Patch the package.json to promote them to dependencies
+    // so they are always installed.
+    patchPackageJson(workDir)
+
     addLog('Installing dependencies (this may take a few minutes)...')
     await runCommand('npm', ['install', '--legacy-peer-deps'], workDir)
 
