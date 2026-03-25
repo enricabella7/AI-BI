@@ -1,16 +1,27 @@
 import { useState, useRef, useEffect } from 'react'
 import './ChatPanel.css'
 
-const SYSTEM_GREETING = {
-  role: 'assistant',
-  text: "Hi! I'm your AI design assistant. Paste or upload your Figma code, then tell me what changes you'd like — colors, layout, new elements, data bindings, and more.",
+const GREETINGS = {
+  zip: "Hi! Upload a Figma Make ZIP to get started. Once it's rendered, I can help you iterate on the design — changing colors, layout, components, and connecting data.",
+  html: "Hi! Paste your HTML code in the Design panel, then describe changes you'd like to make. You can also add {{placeholder}} syntax and connect data sources.",
 }
 
-export default function ChatPanel({ code, onCodeChange }) {
-  const [messages, setMessages] = useState([SYSTEM_GREETING])
+export default function ChatPanel({ mode, buildStatus, htmlCode, onHtmlCodeChange }) {
+  const [messages, setMessages] = useState([
+    { role: 'assistant', text: GREETINGS[mode] }
+  ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef(null)
+  const prevMode = useRef(mode)
+
+  // Update greeting when mode changes
+  useEffect(() => {
+    if (prevMode.current !== mode) {
+      prevMode.current = mode
+      setMessages([{ role: 'assistant', text: GREETINGS[mode] }])
+    }
+  }, [mode])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -22,16 +33,12 @@ export default function ChatPanel({ code, onCodeChange }) {
     setInput('')
     setMessages(prev => [...prev, { role: 'user', text }])
     setLoading(true)
-
-    // Simulate AI response — in production this would call an LLM API
     setTimeout(() => {
-      const response = generateResponse(text, code)
+      const response = generateResponse(text, mode, buildStatus, htmlCode)
       setMessages(prev => [...prev, { role: 'assistant', text: response.message }])
-      if (response.updatedCode) {
-        onCodeChange(response.updatedCode)
-      }
+      if (response.updatedCode) onHtmlCodeChange(response.updatedCode)
       setLoading(false)
-    }, 800 + Math.random() * 700)
+    }, 600 + Math.random() * 600)
   }
 
   const handleKeyDown = (e) => {
@@ -76,10 +83,21 @@ export default function ChatPanel({ code, onCodeChange }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Describe changes to your design..."
+          placeholder={
+            mode === 'zip'
+              ? buildStatus.status === 'ready'
+                ? 'Describe a change to the design...'
+                : 'Upload a ZIP to start iterating...'
+              : 'Describe changes or ask a question...'
+          }
           rows={2}
+          disabled={loading}
         />
-        <button className="chat-send" onClick={sendMessage} disabled={loading || !input.trim()}>
+        <button
+          className="chat-send"
+          onClick={sendMessage}
+          disabled={loading || !input.trim()}
+        >
           Send
         </button>
       </div>
@@ -87,44 +105,72 @@ export default function ChatPanel({ code, onCodeChange }) {
   )
 }
 
-function generateResponse(userMessage, currentCode) {
-  const msg = userMessage.toLowerCase()
+function generateResponse(userMsg, mode, buildStatus, htmlCode) {
+  const msg = userMsg.toLowerCase()
 
-  if (!currentCode) {
+  // ── Zip mode responses ────────────────────────────────────────────────
+  if (mode === 'zip') {
+    if (buildStatus.status !== 'ready') {
+      return {
+        message: 'Please wait until the ZIP is fully built and the preview is ready before requesting changes.',
+      }
+    }
+
+    if (msg.includes('color') || msg.includes('theme') || msg.includes('dark') || msg.includes('light')) {
+      return {
+        message: "To change colors/theme: edit the CSS variables in the extracted project's `src/styles/theme.css`, then re-upload the ZIP. I can generate the specific CSS changes for you — just tell me the target color palette.",
+      }
+    }
+
+    if (msg.includes('data') || msg.includes('connect') || msg.includes('excel') || msg.includes('real')) {
+      return {
+        message: "To connect live data: go to the Data Sources tab to upload an Excel file or connect Power BI. Then switch to HTML mode to use {{placeholder}} bindings, or modify the TypeScript files in the ZIP to fetch from your API before re-uploading.",
+      }
+    }
+
+    if (msg.includes('add') || msg.includes('remove') || msg.includes('change') || msg.includes('modify') || msg.includes('update')) {
+      return {
+        message: `To make structural changes to the design:\n\n1. Extract the ZIP\n2. Edit the TypeScript/TSX files (main component is in src/app/App.tsx)\n3. Re-zip the project folder\n4. Re-upload here\n\nConnect an LLM API to enable me to generate the exact code changes automatically.`,
+      }
+    }
+
+    if (msg.includes('component') || msg.includes('chart') || msg.includes('table') || msg.includes('card')) {
+      return {
+        message: "The Figma Make project uses Recharts for charts and shadcn/ui for cards and tables. I can generate new component code for you — just describe what you need and I'll write the TSX that you can add to the project.",
+      }
+    }
+
     return {
-      message: "I don't see any code loaded yet. Please upload or paste your Figma-generated code first, then I can help you iterate on the design.",
+      message: `I see you want to "${userMsg}". The preview is live above. To modify this design programmatically, I can generate code snippets for you to add to the project's TypeScript files. What specific change would you like to make?`,
     }
   }
 
-  // Color change requests
-  if (msg.includes('color') || msg.includes('blue') || msg.includes('red') || msg.includes('green') || msg.includes('dark') || msg.includes('light') || msg.includes('theme')) {
+  // ── HTML mode responses ───────────────────────────────────────────────
+  if (!htmlCode) {
     return {
-      message: "I've noted your color/theme request. In production, I would modify the CSS variables and color values in your code. For now, try editing the code directly or connect to an LLM API for full AI-powered edits.",
+      message: "Please paste some HTML in the Design panel first, then I can help you modify it.",
     }
   }
 
-  // Layout requests
-  if (msg.includes('layout') || msg.includes('grid') || msg.includes('column') || msg.includes('row') || msg.includes('flex') || msg.includes('sidebar') || msg.includes('responsive')) {
+  if (msg.includes('data') || msg.includes('bind') || msg.includes('placeholder') || msg.includes('connect')) {
     return {
-      message: "Layout changes noted! I can adjust flexbox/grid properties, column counts, spacing, and responsive breakpoints. Connect an LLM API key in the settings to enable full code transformation.",
+      message: "To bind data: add {{placeholder}} in your HTML where values should appear (e.g. {{revenue}}), then go to Data Sources tab to upload an Excel file, and use the Mapping tab to link each placeholder to a column.",
     }
   }
 
-  // Data binding
-  if (msg.includes('data') || msg.includes('bind') || msg.includes('connect') || msg.includes('excel') || msg.includes('power bi') || msg.includes('placeholder')) {
+  if (msg.includes('color') || msg.includes('background') || msg.includes('theme')) {
     return {
-      message: "To bind data: 1) Add {{placeholders}} in your code where dynamic values should appear, 2) Go to the Data Sources tab to upload an Excel file or connect Power BI, 3) Use the Mapping tab to link each placeholder to a data column.",
+      message: "To change colors, edit the CSS in your HTML's <style> block. For example, change `background: #0f172a` to your preferred color. You can also add CSS variables at the top of your stylesheet for easy theming.",
     }
   }
 
-  // Add element
-  if (msg.includes('add') || msg.includes('new') || msg.includes('insert') || msg.includes('create')) {
+  if (msg.includes('layout') || msg.includes('grid') || msg.includes('flex') || msg.includes('column')) {
     return {
-      message: "I can help add new elements to your design — cards, charts, tables, headers, etc. Connect an LLM API for automatic code generation, or describe what you need and I'll provide code snippets you can paste.",
+      message: "For layout changes, use CSS Grid or Flexbox. A responsive dashboard grid: `display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;`",
     }
   }
 
   return {
-    message: `I understand you want to "${userMessage}". To make AI-powered code changes automatically, configure an LLM API endpoint in the app settings. In the meantime, I can guide you on how to make this change manually in the code editor.`,
+    message: `To "${userMsg}", I'd recommend editing the relevant section in your HTML/CSS. Connect an LLM API endpoint to enable me to make direct code edits. What part of the design is this about?`,
   }
 }
