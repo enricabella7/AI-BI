@@ -1,0 +1,52 @@
+.metric-card {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+.metric-card:hover {
+  border-color: #6366f1;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1;
+}
+
+.metric-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.metric-change {
+  font-weight: 600;
+}
+
+.metric-change.up {
+  color: #22c55e;
+}
+
+.metric-change.down {
+  color: #ef4444;
+}
+
+.metric-unit {
+  color: #475569;
+}
