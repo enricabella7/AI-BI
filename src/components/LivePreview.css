@@ -14,7 +14,6 @@
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-
 .preview-label {
   font-size: 0.72rem;
   font-weight: 600;
@@ -22,13 +21,11 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-
 .preview-toolbar-right {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-
 .preview-mode-badge {
   font-size: 0.68rem;
   padding: 0.15rem 0.5rem;
@@ -36,25 +33,77 @@
   background: var(--bg-tertiary);
   color: var(--text-secondary);
 }
-
 .preview-ready-badge {
   font-size: 0.68rem;
   color: var(--success);
   font-weight: 600;
 }
+.preview-pick-badge {
+  font-size: 0.68rem;
+  color: var(--accent);
+  font-weight: 600;
+  animation: pulse-text 1s ease-in-out infinite;
+}
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.preview-modifying-badge {
+  font-size: 0.68rem;
+  color: var(--warning);
+  font-weight: 600;
+}
 
-/* Frame */
+/* Frame wrap */
 .preview-frame-wrap {
   flex: 1;
   position: relative;
   overflow: hidden;
 }
-
+.preview-frame-wrap.picking iframe {
+  pointer-events: none; /* let postMessage handle it */
+}
 .preview-frame {
   width: 100%;
   height: 100%;
   border: none;
   background: white;
+}
+
+/* Overlay while AI is rebuilding (keep preview visible) */
+.modifying-overlay {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--warning);
+  color: var(--warning);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  z-index: 10;
+}
+.modifying-spinner {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid rgba(245, 158, 11, 0.3);
+  border-top-color: var(--warning);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Semi-transparent overlay during pick mode */
+.pick-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(99, 102, 241, 0.08);
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  z-index: 5;
 }
 
 /* Placeholder */
@@ -67,20 +116,17 @@
   padding: 2rem;
   text-align: center;
 }
-
 .placeholder-icon {
   font-size: 3rem;
   color: var(--bg-tertiary);
   margin-bottom: 1rem;
 }
-
 .placeholder-title {
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
 }
-
 .placeholder-text {
   font-size: 0.85rem;
   color: var(--text-muted);
@@ -98,7 +144,6 @@
   padding: 2rem;
   gap: 1.5rem;
 }
-
 .build-steps {
   display: flex;
   flex-direction: column;
@@ -106,40 +151,17 @@
   width: 100%;
   max-width: 320px;
 }
-
 .build-step {
   display: flex;
   align-items: center;
   gap: 0.625rem;
   font-size: 0.82rem;
   color: var(--text-muted);
-  transition: color 0.2s;
 }
-
-.build-step.done {
-  color: var(--success);
-}
-
-.build-step.active {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.build-step.failed {
-  color: var(--danger);
-}
-
-.step-dot {
-  width: 1.2rem;
-  text-align: center;
-  font-size: 0.75rem;
-  flex-shrink: 0;
-}
-
-.step-label {
-  flex: 1;
-}
-
+.build-step.done { color: var(--success); }
+.build-step.active { color: var(--text-primary); font-weight: 600; }
+.step-dot { width: 1.2rem; text-align: center; font-size: 0.75rem; flex-shrink: 0; }
+.step-label { flex: 1; }
 .step-spinner {
   width: 0.875rem;
   height: 0.875rem;
@@ -148,10 +170,7 @@
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Console */
 .build-console {
@@ -162,7 +181,6 @@
   border-radius: 0.5rem;
   overflow: hidden;
 }
-
 .console-header {
   font-size: 0.68rem;
   font-weight: 600;
@@ -172,22 +190,15 @@
   padding: 0.4rem 0.75rem;
   border-bottom: 1px solid var(--border);
 }
-
-.console-lines {
-  padding: 0.5rem 0.75rem;
-  max-height: 160px;
-  overflow-y: auto;
-}
-
+.console-lines { padding: 0.5rem 0.75rem; max-height: 160px; overflow-y: auto; }
 .console-line {
-  font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 0.68rem;
   color: var(--text-muted);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
 }
-
 .build-note {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -195,4 +206,18 @@
   max-width: 320px;
   line-height: 1.5;
   font-style: italic;
+}
+
+/* Error state */
+.error-banner {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--danger);
+}
+.error-message {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  max-width: 400px;
+  text-align: center;
+  line-height: 1.5;
 }

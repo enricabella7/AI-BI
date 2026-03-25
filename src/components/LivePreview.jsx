@@ -1,18 +1,43 @@
 import { useRef, useEffect, useState } from 'react'
 import './LivePreview.css'
 
-export default function LivePreview({ mode, buildStatus, htmlCode }) {
+export default function LivePreview({ mode, buildStatus, htmlCode, selectingElement, onElementSelected }) {
   const iframeRef = useRef(null)
   const [iframeKey, setIframeKey] = useState(0)
+  const prevStatus = useRef(buildStatus.status)
 
-  // When zip build becomes ready, refresh the iframe
+  // Reload iframe when a build/rebuild finishes
   useEffect(() => {
-    if (mode === 'zip' && buildStatus.status === 'ready') {
+    const was = prevStatus.current
+    const now = buildStatus.status
+    prevStatus.current = now
+    if (mode === 'zip' && now === 'ready' && (was === 'building' || was === 'modifying')) {
       setIframeKey(k => k + 1)
     }
   }, [mode, buildStatus.status])
 
-  // Render HTML code directly into iframe
+  // Enable / disable pick mode in the iframe via postMessage
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe?.contentWindow) return
+    iframe.contentWindow.postMessage(
+      { type: selectingElement ? 'ENABLE_SELECT_MODE' : 'DISABLE_SELECT_MODE' },
+      '*'
+    )
+  }, [selectingElement])
+
+  // Listen for element-selected postMessage from iframe
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === 'ELEMENT_SELECTED' && onElementSelected) {
+        onElementSelected(e.data.selector, e.data.text)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [onElementSelected])
+
+  // Render HTML code directly into iframe (HTML mode)
   useEffect(() => {
     if (mode !== 'html') return
     const iframe = iframeRef.current
@@ -24,84 +49,70 @@ export default function LivePreview({ mode, buildStatus, htmlCode }) {
     doc.close()
   }, [mode, htmlCode])
 
-  // ── Zip mode ───────────────────────────────────────────────────────────
-  if (mode === 'zip') {
-    return (
-      <div className="live-preview">
-        <PreviewToolbar mode={mode} buildStatus={buildStatus} />
-        <div className="preview-frame-wrap">
-          {buildStatus.status === 'ready' ? (
-            <iframe
-              key={iframeKey}
-              className="preview-frame"
-              src="/preview/"
-              title="Figma Make Preview"
-            />
-          ) : buildStatus.status === 'idle' ? (
-            <Placeholder
-              icon="⬡"
-              title="No design loaded"
-              text="Upload a Figma Make ZIP file from the Design panel to see your dashboard here."
-            />
-          ) : (
-            <BuildProgress buildStatus={buildStatus} />
-          )}
-        </div>
-      </div>
-    )
-  }
+  const isBuilding = ['uploading', 'extracting', 'installing', 'building'].includes(buildStatus.status)
+  const isModifying = buildStatus.status === 'modifying'
+  const isReady = buildStatus.status === 'ready'
+  const isError = buildStatus.status === 'error'
 
-  // ── HTML mode ──────────────────────────────────────────────────────────
   return (
     <div className="live-preview">
-      <PreviewToolbar mode={mode} buildStatus={buildStatus} />
-      <div className="preview-frame-wrap">
-        {htmlCode ? (
-          <iframe
-            ref={iframeRef}
-            className="preview-frame"
-            title="HTML Preview"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        ) : (
-          <Placeholder
-            icon="◇"
-            title="No code loaded"
-            text="Switch to HTML mode and paste your HTML/JSX code in the Design panel."
-          />
+      <div className="preview-toolbar">
+        <span className="preview-label">Live Preview</span>
+        <div className="preview-toolbar-right">
+          <span className="preview-mode-badge">{mode === 'zip' ? 'Figma Make' : 'HTML'}</span>
+          {isReady && !selectingElement && <span className="preview-ready-badge">● Live</span>}
+          {selectingElement && <span className="preview-pick-badge">⊕ Click an element in the preview</span>}
+          {isModifying && <span className="preview-modifying-badge">⟳ AI applying changes...</span>}
+        </div>
+      </div>
+
+      <div className={`preview-frame-wrap ${selectingElement ? 'picking' : ''}`}>
+        {/* ── ZIP mode ──────────────────────────────────────────────── */}
+        {mode === 'zip' && (
+          <>
+            {(isReady || isModifying) && (
+              <>
+                <iframe
+                  key={iframeKey}
+                  ref={iframeRef}
+                  className="preview-frame"
+                  src="/preview/"
+                  title="Figma Make Preview"
+                />
+                {isModifying && <div className="modifying-overlay"><span className="modifying-spinner" />AI rebuilding…</div>}
+                {selectingElement && <div className="pick-overlay" />}
+              </>
+            )}
+            {isBuilding && <BuildProgress buildStatus={buildStatus} />}
+            {isError && <ErrorState error={buildStatus.error} log={buildStatus.log} />}
+            {buildStatus.status === 'idle' && (
+              <Placeholder icon="⬡" title="No design loaded"
+                text="Upload a Figma Make ZIP file from the Design panel to see your dashboard here." />
+            )}
+          </>
+        )}
+
+        {/* ── HTML mode ────────────────────────────────────────────── */}
+        {mode === 'html' && (
+          htmlCode
+            ? <iframe ref={iframeRef} className="preview-frame" title="HTML Preview" sandbox="allow-scripts allow-same-origin" />
+            : <Placeholder icon="◇" title="No code loaded" text="Paste HTML in the Design panel to preview it here." />
         )}
       </div>
     </div>
   )
 }
 
-function PreviewToolbar({ mode, buildStatus }) {
-  return (
-    <div className="preview-toolbar">
-      <span className="preview-label">Live Preview</span>
-      <div className="preview-toolbar-right">
-        <span className="preview-mode-badge">
-          {mode === 'zip' ? 'Figma Make' : 'HTML'}
-        </span>
-        {buildStatus.status === 'ready' && (
-          <span className="preview-ready-badge">● Live</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
+// ── Sub-components ────────────────────────────────────────────────────────────
 function BuildProgress({ buildStatus }) {
   const { status, log } = buildStatus
-
   const STEPS = [
-    { key: 'uploading',   label: 'Uploading'            },
-    { key: 'extracting',  label: 'Extracting ZIP'       },
-    { key: 'installing',  label: 'Installing packages'  },
-    { key: 'building',    label: 'Building'             },
-    { key: 'ready',       label: 'Ready'                },
+    { key: 'uploading', label: 'Uploading' },
+    { key: 'extracting', label: 'Extracting ZIP' },
+    { key: 'installing', label: 'Installing packages' },
+    { key: 'building', label: 'Building' },
+    { key: 'ready', label: 'Ready' },
   ]
-
   const currentIdx = STEPS.findIndex(s => s.key === status)
 
   return (
@@ -110,37 +121,42 @@ function BuildProgress({ buildStatus }) {
         {STEPS.map((step, i) => {
           const done = i < currentIdx || status === 'ready'
           const active = step.key === status
-          const failed = status === 'error' && i === currentIdx
           return (
-            <div
-              key={step.key}
-              className={`build-step ${done ? 'done' : ''} ${active ? 'active' : ''} ${failed ? 'failed' : ''}`}
-            >
-              <span className="step-dot">
-                {done ? '✓' : active ? '◉' : '○'}
-              </span>
+            <div key={step.key} className={`build-step ${done ? 'done' : ''} ${active ? 'active' : ''}`}>
+              <span className="step-dot">{done ? '✓' : active ? '◉' : '○'}</span>
               <span className="step-label">{step.label}</span>
               {active && <span className="step-spinner" />}
             </div>
           )
         })}
       </div>
-
       {log.length > 0 && (
         <div className="build-console">
           <p className="console-header">Build output</p>
           <div className="console-lines">
-            {log.slice(-15).map((line, i) => (
-              <div key={i} className="console-line">{line}</div>
-            ))}
+            {log.slice(-15).map((line, i) => <div key={i} className="console-line">{line}</div>)}
           </div>
         </div>
       )}
-
       {status === 'installing' && (
-        <p className="build-note">
-          Installing packages may take 2–5 minutes depending on your internet speed.
-        </p>
+        <p className="build-note">Installing packages may take 2–5 minutes depending on your internet speed.</p>
+      )}
+    </div>
+  )
+}
+
+function ErrorState({ error, log }) {
+  return (
+    <div className="build-progress">
+      <div className="error-banner">✗ Build failed</div>
+      {error && <p className="error-message">{error}</p>}
+      {log.length > 0 && (
+        <div className="build-console">
+          <p className="console-header">Last output</p>
+          <div className="console-lines">
+            {log.slice(-20).map((line, i) => <div key={i} className="console-line">{line}</div>)}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -158,17 +174,9 @@ function Placeholder({ icon, title, text }) {
 
 function buildHtmlDoc(code) {
   const styleBlocks = (code.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || []).join('\n')
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 16px; min-height: 100vh; }
-</style>
-${styleBlocks}
-</head>
-<body>${code}</body>
-</html>`
+  return `<!DOCTYPE html><html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#e2e8f0;padding:16px;min-height:100vh}</style>
+${styleBlocks}</head><body>${code}</body></html>`
 }

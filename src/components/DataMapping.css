@@ -1,25 +1,28 @@
 .data-mapping {
   padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  overflow-y: auto;
 }
 
+/* Empty state */
 .dm-empty {
   text-align: center;
   padding: 2rem 1rem;
 }
-
 .dm-empty-title {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 0.4rem;
 }
-
 .dm-empty-text {
   font-size: 0.78rem;
   color: var(--text-muted);
   line-height: 1.6;
 }
-
 .dm-empty-text code {
   background: var(--bg-primary);
   padding: 0.1rem 0.35rem;
@@ -27,16 +30,14 @@
   font-size: 0.72rem;
   color: var(--accent);
 }
-
-.dm-elements-preview {
+.dm-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
   justify-content: center;
   margin-top: 0.75rem;
 }
-
-.dm-element-tag {
+.dm-tag {
   font-size: 0.72rem;
   padding: 0.15rem 0.5rem;
   border-radius: 0.25rem;
@@ -46,19 +47,20 @@
   font-family: monospace;
 }
 
+/* Info text */
 .dm-info {
   font-size: 0.78rem;
   color: var(--text-muted);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
   line-height: 1.5;
 }
 
+/* HTML mode rows */
 .dm-list {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
-
 .dm-row {
   background: var(--bg-primary);
   border: 1px solid var(--border);
@@ -67,29 +69,17 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
-
 .dm-element {
-  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 0.78rem;
   color: var(--accent);
   font-weight: 600;
-  min-width: 80px;
+  min-width: 70px;
 }
-
-.dm-arrow {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.dm-selectors {
-  display: flex;
-  gap: 0.35rem;
-  flex: 1;
-  min-width: 0;
-}
-
+.dm-arrow { color: var(--text-muted); font-size: 0.85rem; }
+.dm-selectors { display: flex; gap: 0.35rem; flex: 1; min-width: 0; }
 .dm-select {
   flex: 1;
   background: var(--bg-secondary);
@@ -101,19 +91,132 @@
   outline: none;
   min-width: 0;
 }
-
-.dm-select:focus {
-  border-color: var(--accent);
-}
-
+.dm-select:focus { border-color: var(--accent); }
 .dm-mapped-badge {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--success);
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.3);
   padding: 0.1rem 0.4rem;
   border-radius: 0.2rem;
 }
+
+/* ZIP mode bindings */
+.zip-mapping {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+.zip-binding {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.zip-binding-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.zip-binding-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.zip-binding-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.zip-binding-remove:hover { color: var(--danger); }
+
+.zip-binding-selector-row {
+  display: flex;
+  gap: 0.35rem;
+}
+.selector-input {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  color: var(--text-primary);
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
+  outline: none;
+}
+.selector-input:focus { border-color: var(--accent); }
+.selector-input::placeholder { color: var(--text-muted); }
+
+.pick-btn {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.3rem;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.pick-btn:hover { background: var(--accent); color: white; }
+
+.zip-binding-source-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.zip-binding-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.zip-binding-selector-preview {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Add binding */
+.add-binding-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+.add-binding-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px dashed var(--border);
+  border-radius: 0.3rem;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  outline: none;
+}
+.add-binding-input:focus { border-color: var(--accent); border-style: solid; }
+.add-binding-input::placeholder { color: var(--text-muted); }
+.add-binding-btn {
+  padding: 0.4rem 0.7rem;
+  border: none;
+  border-radius: 0.3rem;
+  background: var(--accent);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.add-binding-btn:hover { background: var(--accent-hover); }

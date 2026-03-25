@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Header from './components/Header.jsx'
 import CodeUpload from './components/CodeUpload.jsx'
 import LivePreview from './components/LivePreview.jsx'
@@ -7,49 +7,57 @@ import DataSources from './components/DataSources.jsx'
 import DataMapping from './components/DataMapping.jsx'
 import './App.css'
 
-const ACTIVE_BUILD_STATUSES = ['uploading', 'extracting', 'installing', 'building']
+const ACTIVE_BUILD = ['uploading', 'extracting', 'installing', 'building', 'modifying']
 
 export default function App() {
-  // 'zip' = Figma Make zip upload  |  'html' = paste HTML/JSX directly
   const [mode, setMode] = useState('zip')
   const [htmlCode, setHtmlCode] = useState('')
   const [buildStatus, setBuildStatus] = useState({ status: 'idle', log: [], error: null })
 
+  // Data sources (shared between modes)
   const [dataSources, setDataSources] = useState([])
-  const [mappings, setMappings] = useState({})
+
+  // HTML mode: placeholder-based mappings
   const [dataElements, setDataElements] = useState([])
+  const [mappings, setMappings] = useState({})
+
+  // ZIP mode: CSS-selector-based bindings
+  const [zipBindings, setZipBindings] = useState([])
+
+  // Element pick mode coordination between DataMapping ↔ LivePreview
+  const [selectingForId, setSelectingForId] = useState(null)
+
   const [chatOpen, setChatOpen] = useState(true)
   const [activeTab, setActiveTab] = useState('upload')
 
-  // Poll build status while a build is in progress
+  // ── Build status polling ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!ACTIVE_BUILD_STATUSES.includes(buildStatus.status)) return
+    if (!ACTIVE_BUILD.includes(buildStatus.status)) return
     const id = setInterval(async () => {
       try {
         const res = await fetch('/api/status')
-        const data = await res.json()
-        setBuildStatus(data)
-      } catch { /* network hiccup, retry */ }
+        setBuildStatus(await res.json())
+      } catch { /* retry */ }
     }, 1500)
     return () => clearInterval(id)
   }, [buildStatus.status])
 
-  // ── Upload zip to server middleware ──────────────────────────────────────
+  // ── ZIP upload ───────────────────────────────────────────────────────────
   const handleZipUpload = useCallback(async (file) => {
     setBuildStatus({ status: 'uploading', log: ['Uploading zip...'], error: null })
+    setZipBindings([])
     try {
       await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/zip' },
         body: file,
       })
-      // Polling effect will take over from here
     } catch (err) {
       setBuildStatus({ status: 'error', log: ['Upload failed'], error: err.message })
     }
   }, [])
 
-  // ── HTML mode: extract {{placeholders}} for data mapping ─────────────────
+  // ── HTML code + placeholder extraction ──────────────────────────────────
   const handleHtmlCodeChange = useCallback((code) => {
     setHtmlCode(code)
     const placeholders = [...new Set(
@@ -59,26 +67,72 @@ export default function App() {
   }, [])
 
   // ── Data sources ─────────────────────────────────────────────────────────
-  const handleAddDataSource = useCallback((source) => {
-    setDataSources(prev => [...prev, { ...source, id: Date.now() }])
+  const handleAddSource = useCallback((src) => {
+    setDataSources(prev => [...prev, { ...src, id: Date.now() }])
   }, [])
 
-  const handleRemoveDataSource = useCallback((id) => {
+  const handleRemoveSource = useCallback((id) => {
     setDataSources(prev => prev.filter(s => s.id !== id))
     setMappings(prev => {
       const next = { ...prev }
-      for (const key of Object.keys(next)) {
-        if (next[key]?.sourceId === id) delete next[key]
-      }
+      for (const k of Object.keys(next)) if (next[k]?.sourceId === id) delete next[k]
       return next
     })
+    setZipBindings(prev => prev.map(b => b.sourceId === id ? { ...b, sourceId: null, column: null } : b))
   }, [])
 
-  const handleMapElement = useCallback((element, sourceId, column) => {
+  // ── HTML mode mapping ────────────────────────────────────────────────────
+  const handleMap = useCallback((element, sourceId, column) => {
     setMappings(prev => ({ ...prev, [element]: { sourceId, column } }))
   }, [])
 
-  // Resolve {{placeholders}} → actual values for HTML mode
+  // ── ZIP mode bindings ────────────────────────────────────────────────────
+  const handleAddBinding = useCallback((binding) => {
+    setZipBindings(prev => [...prev, binding])
+  }, [])
+
+  const handleRemoveBinding = useCallback((id) => {
+    setZipBindings(prev => prev.filter(b => b.id !== id))
+  }, [])
+
+  const handleUpdateBinding = useCallback((id, patch) => {
+    setZipBindings(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b))
+  }, [])
+
+  // ── Element pick coordination ─────────────────────────────────────────────
+  const handleStartPick = useCallback((bindingId) => {
+    setSelectingForId(bindingId)
+  }, [])
+
+  const handleElementSelected = useCallback((selector, text) => {
+    if (!selectingForId) return
+    setZipBindings(prev => prev.map(b =>
+      b.id === selectingForId
+        ? { ...b, selector, label: text || b.label }
+        : b
+    ))
+    setSelectingForId(null)
+  }, [selectingForId])
+
+  // ── Sync ZIP bindings → server data overrides ───────────────────────────
+  useEffect(() => {
+    if (mode !== 'zip' || buildStatus.status !== 'ready') return
+    const overrides = {}
+    for (const binding of zipBindings) {
+      if (!binding.selector || !binding.sourceId || !binding.column) continue
+      const src = dataSources.find(s => s.id === binding.sourceId)
+      if (!src?.data?.length) continue
+      const val = src.data[0][binding.column]
+      if (val !== undefined) overrides[binding.selector] = String(val)
+    }
+    fetch('/api/data-override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ overrides }),
+    }).catch(console.error)
+  }, [mode, buildStatus.status, zipBindings, dataSources])
+
+  // HTML mode: resolve placeholders for live preview
   const resolvedHtml = resolveData(htmlCode, mappings, dataSources)
 
   return (
@@ -88,51 +142,44 @@ export default function App() {
 
         <aside className="left-panel">
           <div className="panel-tabs">
-            <button
-              className={`panel-tab ${activeTab === 'upload' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upload')}
-            >
-              Design
-            </button>
-            <button
-              className={`panel-tab ${activeTab === 'datasources' ? 'active' : ''}`}
-              onClick={() => setActiveTab('datasources')}
-            >
-              Data Sources
-            </button>
-            <button
-              className={`panel-tab ${activeTab === 'mapping' ? 'active' : ''}`}
-              onClick={() => setActiveTab('mapping')}
-              disabled={mode === 'zip'}
-              title={mode === 'zip' ? 'Data mapping is available in HTML mode' : undefined}
-            >
-              Mapping
-            </button>
+            {['upload', 'datasources', 'mapping'].map(tab => (
+              <button
+                key={tab}
+                className={`panel-tab ${activeTab === tab ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab === 'upload' ? 'Design' : tab === 'datasources' ? 'Data Sources' : 'Mapping'}
+              </button>
+            ))}
           </div>
           <div className="panel-content">
             {activeTab === 'upload' && (
               <CodeUpload
-                mode={mode}
-                onModeChange={setMode}
+                mode={mode} onModeChange={setMode}
                 buildStatus={buildStatus}
                 onZipUpload={handleZipUpload}
-                htmlCode={htmlCode}
-                onHtmlCodeChange={handleHtmlCodeChange}
+                htmlCode={htmlCode} onHtmlCodeChange={handleHtmlCodeChange}
               />
             )}
             {activeTab === 'datasources' && (
               <DataSources
                 sources={dataSources}
-                onAdd={handleAddDataSource}
-                onRemove={handleRemoveDataSource}
+                onAdd={handleAddSource}
+                onRemove={handleRemoveSource}
               />
             )}
             {activeTab === 'mapping' && (
               <DataMapping
+                mode={mode}
                 dataElements={dataElements}
-                dataSources={dataSources}
                 mappings={mappings}
-                onMap={handleMapElement}
+                onMap={handleMap}
+                zipBindings={zipBindings}
+                onAddBinding={handleAddBinding}
+                onRemoveBinding={handleRemoveBinding}
+                onUpdateBinding={handleUpdateBinding}
+                onStartPick={handleStartPick}
+                dataSources={dataSources}
               />
             )}
           </div>
@@ -143,6 +190,8 @@ export default function App() {
             mode={mode}
             buildStatus={buildStatus}
             htmlCode={resolvedHtml}
+            selectingElement={selectingForId !== null}
+            onElementSelected={handleElementSelected}
           />
         </main>
 
@@ -165,11 +214,11 @@ export default function App() {
 function resolveData(code, mappings, dataSources) {
   if (!code) return code
   return code.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    const mapping = mappings[key]
-    if (!mapping) return match
-    const source = dataSources.find(s => s.id === mapping.sourceId)
-    if (!source?.data?.length) return match
-    const val = source.data[0][mapping.column]
+    const m = mappings[key]
+    if (!m) return match
+    const src = dataSources.find(s => s.id === m.sourceId)
+    if (!src?.data?.length) return match
+    const val = src.data[0][m.column]
     return val !== undefined ? val : match
   })
 }
