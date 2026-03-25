@@ -1,0 +1,180 @@
+.data-sources {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ds-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ds-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ds-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.ds-btn-icon {
+  font-size: 1rem;
+}
+
+/* Power BI connect */
+.pbi-connect {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pbi-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  padding: 0.45rem 0.6rem;
+  outline: none;
+}
+
+.pbi-input:focus {
+  border-color: var(--accent);
+}
+
+.pbi-input::placeholder {
+  color: var(--text-muted);
+}
+
+.pbi-btn {
+  padding: 0.45rem 0.75rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: var(--accent);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Empty state */
+.ds-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.ds-empty-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.ds-empty-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Source list */
+.ds-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ds-item {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ds-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ds-type-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ds-type-badge.excel {
+  background: #166534;
+  color: #86efac;
+}
+
+.ds-type-badge.powerbi {
+  background: #7c2d12;
+  color: #fdba74;
+}
+
+.ds-item-name {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+  transition: color 0.15s;
+}
+
+.ds-remove:hover {
+  color: var(--danger);
+}
+
+.ds-item-meta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.ds-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.ds-col-tag {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.2rem;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}

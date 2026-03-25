@@ -1,0 +1,119 @@
+.data-mapping {
+  padding: 0.75rem;
+}
+
+.dm-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.dm-empty-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.dm-empty-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.dm-empty-text code {
+  background: var(--bg-primary);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.dm-elements-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.dm-element-tag {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  font-family: monospace;
+}
+
+.dm-info {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.dm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dm-row {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dm-element {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 80px;
+}
+
+.dm-arrow {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.dm-selectors {
+  display: flex;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.dm-select {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.4rem;
+  outline: none;
+  min-width: 0;
+}
+
+.dm-select:focus {
+  border-color: var(--accent);
+}
+
+.dm-mapped-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.2rem;
+}
