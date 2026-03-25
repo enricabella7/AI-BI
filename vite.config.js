@@ -155,8 +155,11 @@ const PREVIEW_INJECT = `
     current = overrides;
     Object.entries(overrides).forEach(function([sel, val]) {
       try {
+        // data-ai-bi selectors point to a known exact element — update unconditionally.
+        // Generic CSS selectors: only update leaf elements to avoid clobbering children.
+        var exact = sel.indexOf('data-ai-bi') !== -1;
         document.querySelectorAll(sel).forEach(function(el) {
-          if (el.children.length === 0) el.textContent = val;
+          if (exact || el.children.length === 0) el.textContent = val;
         });
       } catch(e) {}
     });
@@ -202,9 +205,12 @@ const PREVIEW_INJECT = `
         document.body.style.outline = '';
         document.removeEventListener('mouseover', onOver, true);
         document.removeEventListener('click', onClick, true);
+        // Inject a stable data attribute so the selector survives React re-renders
+        var uid = 'bi' + Date.now();
+        el.setAttribute('data-ai-bi', uid);
         window.parent.postMessage({
           type: 'ELEMENT_SELECTED',
-          selector: buildSelector(el),
+          selector: '[data-ai-bi="' + uid + '"]',
           text: (el.textContent || '').trim().slice(0, 60),
           dataPoints: extractDataPoints(el)
         }, '*');
@@ -223,6 +229,7 @@ const PREVIEW_INJECT = `
   function extractDataPoints(root) {
     var points = [];
     var seen = new Set();
+    var counter = 0;
     walk(root);
     return points.slice(0, 10);
 
@@ -232,8 +239,14 @@ const PREVIEW_INJECT = `
         var t = node.textContent.trim();
         if (t && !seen.has(t) && isDataLike(t)) {
           seen.add(t);
+          var parentEl = node.parentElement;
+          if (!parentEl) return;
+          // Inject stable identifier if not already present
+          if (!parentEl.hasAttribute('data-ai-bi')) {
+            parentEl.setAttribute('data-ai-bi', 'bi' + Date.now() + (counter++));
+          }
           points.push({
-            selector: buildSelector(node.parentElement),
+            selector: '[data-ai-bi="' + parentEl.getAttribute('data-ai-bi') + '"]',
             text: t,
             type: detectType(t)
           });
