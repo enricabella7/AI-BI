@@ -165,26 +165,21 @@ const PREVIEW_INJECT = `
     });
   }
 
-  // MutationObserver reapplies overrides after React re-renders
-  var observer = new MutationObserver(function() {
-    if (Object.keys(current).length) applyOverrides(current);
-  });
-
-  document.addEventListener('DOMContentLoaded', function() {
-    observer.observe(document.body, { childList: true, subtree: true });
-  });
-
+  // Fetch existing overrides once on load (restores state after iframe reload)
   function fetchAndApply() {
     fetch('/api/data-state').then(function(r) { return r.json(); })
       .then(function(d) { applyOverrides(d.overrides || {}); })
       .catch(function() {});
   }
   fetchAndApply();
-  setInterval(fetchAndApply, 1500);
 
-  // Element-pick mode (triggered by parent via postMessage)
+  // Element-pick mode and binding application (triggered by parent via postMessage)
   window.addEventListener('message', function(e) {
     if (!e.data) return;
+
+    if (e.data.type === 'APPLY_OVERRIDES') {
+      applyOverrides(e.data.overrides || {});
+    }
 
     if (e.data.type === 'ENABLE_SELECT_MODE') {
       document.body.style.cursor = 'crosshair';

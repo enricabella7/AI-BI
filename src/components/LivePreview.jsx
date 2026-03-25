@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import './LivePreview.css'
 
-export default function LivePreview({ mode, buildStatus, htmlCode, selectingElement, onElementSelected }) {
+export default function LivePreview({ mode, buildStatus, htmlCode, selectingElement, onElementSelected, bindingApply }) {
   const iframeRef = useRef(null)
   const [iframeKey, setIframeKey] = useState(0)
   const [iframeReady, setIframeReady] = useState(false)
@@ -27,13 +27,29 @@ export default function LivePreview({ mode, buildStatus, htmlCode, selectingElem
     )
   }, [selectingElement, iframeReady])
 
+  // Apply bindings on demand: POST to server (persists for reloads) + send direct postMessage
+  useEffect(() => {
+    if (!bindingApply || !iframeReady) return
+    const { overrides } = bindingApply
+    fetch('/api/data-override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ overrides }),
+    }).catch(console.error)
+    iframeRef.current?.contentWindow?.postMessage({ type: 'APPLY_OVERRIDES', overrides }, '*')
+  }, [bindingApply, iframeReady])
+
   // Also send immediately on iframe load if pick mode is already active
   const handleIframeLoad = useCallback(() => {
     setIframeReady(true)
     if (selectingElement) {
       iframeRef.current?.contentWindow?.postMessage({ type: 'ENABLE_SELECT_MODE' }, '*')
     }
-  }, [selectingElement])
+    // Re-apply bindings after iframe reload (the iframe also does a one-time fetch, but postMessage is faster)
+    if (bindingApply?.overrides) {
+      iframeRef.current?.contentWindow?.postMessage({ type: 'APPLY_OVERRIDES', overrides: bindingApply.overrides }, '*')
+    }
+  }, [selectingElement, bindingApply])
 
   // Listen for element-selected postMessage from iframe
   useEffect(() => {

@@ -233,7 +233,7 @@ function ZipBinding({ binding, dataSources, onUpdate, onRemove, onStartPick }) {
   )
 }
 
-function ZipMapping({ zipBindings, suggestedPoints, dataSources, onAddBinding, onRemoveBinding, onUpdateBinding, onStartPick, onClearSuggestions }) {
+function ZipMapping({ zipBindings, suggestedPoints, dataSources, onAddBinding, onRemoveBinding, onUpdateBinding, onStartPick, onClearSuggestions, onApply }) {
   const [newLabel, setNewLabel] = useState('')
 
   const addBinding = (label = '', selector = '', detectedType = null) => {
@@ -260,10 +260,15 @@ function ZipMapping({ zipBindings, suggestedPoints, dataSources, onAddBinding, o
 
   return (
     <div className="zip-mapping">
-      <p className="dm-info">
-        Click <strong>⊕ Pick</strong> to select an element in the preview. Data-like values
-        inside it are detected automatically.
-      </p>
+      <div className="dm-apply-bar">
+        <p className="dm-info">
+          Click <strong>⊕ Pick</strong> to select an element in the preview, map it to a column, then hit Apply.
+        </p>
+        <button className="apply-bindings-btn" onClick={onApply}
+          disabled={!zipBindings.some(b => b.selector && b.sourceId && b.column)}>
+          ▶ Apply Bindings
+        </button>
+      </div>
 
       {/* Suggested data points from last pick */}
       {suggestedPoints.length > 0 && (
@@ -317,7 +322,7 @@ export default function DataMapping({
   mode,
   dataElements, mappings, onMap,
   zipBindings, suggestedPoints, onAddBinding, onRemoveBinding, onUpdateBinding, onStartPick, onClearSuggestions,
-  dataSources,
+  dataSources, onApply,
 }) {
   return (
     <div className="data-mapping">
@@ -325,7 +330,7 @@ export default function DataMapping({
         ? <HtmlMapping dataElements={dataElements} dataSources={dataSources} mappings={mappings} onMap={onMap} />
         : <ZipMapping zipBindings={zipBindings} suggestedPoints={suggestedPoints} dataSources={dataSources}
             onAddBinding={onAddBinding} onRemoveBinding={onRemoveBinding} onUpdateBinding={onUpdateBinding}
-            onStartPick={onStartPick} onClearSuggestions={onClearSuggestions} />
+            onStartPick={onStartPick} onClearSuggestions={onClearSuggestions} onApply={onApply} />
       }
     </div>
   )

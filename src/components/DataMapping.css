@@ -158,3 +158,13 @@
   background: var(--accent); color: white; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .add-binding-btn:hover { background: var(--accent-hover); }
+
+/* ── Apply bindings bar ── */
+.dm-apply-bar { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+.apply-bindings-btn {
+  align-self: flex-start; padding: 0.45rem 1rem; border: none; border-radius: 0.3rem;
+  background: var(--accent); color: white; font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; letter-spacing: 0.02em;
+}
+.apply-bindings-btn:hover:not(:disabled) { background: var(--accent-hover); }
+.apply-bindings-btn:disabled { opacity: 0.4; cursor: not-allowed; }

@@ -116,9 +116,10 @@ export default function App() {
     setSelectingForId(null)
   }, [selectingForId])
 
-  // ── Sync ZIP bindings → server data overrides (with formatting) ─────────
-  useEffect(() => {
-    if (mode !== 'zip' || buildStatus.status !== 'ready') return
+  // ── Apply ZIP bindings on demand ─────────────────────────────────────────
+  const [bindingApply, setBindingApply] = useState(null)
+
+  const handleApplyBindings = useCallback(() => {
     const overrides = {}
     for (const binding of zipBindings) {
       if (!binding.selector || !binding.sourceId || !binding.column) continue
@@ -127,12 +128,8 @@ export default function App() {
       const raw = src.data[0][binding.column]
       if (raw !== undefined) overrides[binding.selector] = formatValue(raw, binding.format)
     }
-    fetch('/api/data-override', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ overrides }),
-    }).catch(console.error)
-  }, [mode, buildStatus.status, zipBindings, dataSources])
+    setBindingApply({ overrides, ts: Date.now() })
+  }, [zipBindings, dataSources])
 
   // HTML mode: resolve placeholders for live preview
   const resolvedHtml = resolveData(htmlCode, mappings, dataSources)
@@ -184,6 +181,7 @@ export default function App() {
                 onStartPick={handleStartPick}
                 onClearSuggestions={() => setSuggestedPoints([])}
                 dataSources={dataSources}
+                onApply={handleApplyBindings}
               />
             )}
           </div>
@@ -196,6 +194,7 @@ export default function App() {
             htmlCode={resolvedHtml}
             selectingElement={selectingForId !== null}
             onElementSelected={handleElementSelected}
+            bindingApply={bindingApply}
           />
         </main>
 
